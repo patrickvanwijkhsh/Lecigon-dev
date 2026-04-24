@@ -1,0 +1,169 @@
+body {
+  font-family: Arial;
+  text-align: center;
+  background: #f5f5f5;
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  font-size: 24px;
+  padding: 15px;
+  margin: 10px;
+  width: 80%;
+  border-radius: 10px;
+}
+
+.start {
+  background: #4caf50;
+  color: white;
+}
+
+.dose {
+  background: #2196f3;
+  color: white;
+}
+
+.remove {
+  background: #ff9800;
+  color: white;
+}
+
+.reset {
+  background: #f44336;
+  color: white;
+}
+
+.big {
+  font-size: 32px;
+  margin-top: 20px;
+}
+
+.warning {
+  color: red;
+}
+
+#doseLog {
+  white-space: pre-line;
+  font-size: 20px;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.row button {
+  width: 45%;
+  font-size: 20px;
+  padding: 12px;
+}
+
+.row button {
+  width: 45%;
+}
+
+#historyFooter {
+  display: flex;
+  gap: 8px;
+}
+
+#historyFooter button {
+  flex: 1;
+  /* 🔥 allemaal exact even breed */
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+.danger {
+  background: #f44336;
+  color: white;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 5px 12px;
+  margin: 10px auto;
+  width: 100%;
+  margin: 8px 0;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card h3 {
+  margin: 0 0 -10px 0;
+}
+
+.card .meta {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.dose-item {
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.delete-day {
+  margin-top: 10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 8px;
+  width: 100%;
+  border-radius: 8px;
+}
+
+#historyContent {
+  padding: 0 12px 120px 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -10px 0;
+}
+
+.bar-label {
+  width: 50px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.bar-container {
+  flex: 1;
+  height: 10px;
+  background: #ddd;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.bar-fill {
+  height: 100%;
+  background: #2e7d32;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #2e7d32, #66bb6a);
+}
+
+.bar-count {
+  width: 25px;
+  text-align: right;
+  font-size: 12px;
+  flex-shrink: 0;
+}
