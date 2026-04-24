@@ -82,18 +82,21 @@
         }
 
         #historyFooter {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: white;
-            padding: 10px;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 8px;
         }
 
-        #historyFooter {
-            display: flex;
-            gap: 10px;
+        #historyFooter button {
+            flex: 1;
+            /* 🔥 allemaal exact even breed */
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 8px;
+        }
+
+        .danger {
+            background: #f44336;
+            color: white;
         }
 
         .card {
@@ -212,13 +215,9 @@
         <div id="historyContent" style="white-space:pre-line; font-size:20px;"></div>
 
         <div id="historyFooter">
-            <button onclick="clearHistory()" style="background:#f44336;color:white;width:48%;">
-                CLEAR
-            </button>
-
-            <button onclick="closeHistory()" style="width:48%;">
-                TERUG
-            </button>
+            <button class="danger" onclick="clearHistory()">CLEAR</button>
+            <button onclick="exportCSV()">EXPORT CSV</button>
+            <button onclick="closeHistory()">TERUG</button>
         </div>
     </div>
 
@@ -611,6 +610,44 @@
             if (state.running) {
                 state.remainingTime = diff;
             }
+        }
+
+        function exportCSV() {
+            const history = state.history || {};
+
+            const rows = [
+                ["Datum", "Dosis", "Tijd", "Uurblok"]
+            ];
+
+            Object.keys(history)
+                .sort((a, b) => new Date(a.split("-").reverse().join("-")) - new Date(b.split("-").reverse().join("-")))
+                .forEach(date => {
+                    history[date].forEach((time, i) => {
+
+                        const hour = parseInt(time.split(":")[0]);
+
+                        const block =
+                            hour < 6 ? "00-06" :
+                                hour < 12 ? "06-12" :
+                                    hour < 18 ? "12-18" :
+                                        "18-24";
+
+                        rows.push([date, i + 1, time, block]);
+                    });
+                });
+
+            // Excel-friendly (BOM + ; separator voor NL)
+            const csv = "\uFEFF" + rows.map(r => r.join(";")).join("\n");
+
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "lecigon_export.csv";
+            a.click();
+
+            URL.revokeObjectURL(url);
         }
 
         function openHistory() {
