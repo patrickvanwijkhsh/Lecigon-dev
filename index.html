@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Lecigon">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f5f5f5;
+        }
+
+        button {
+            font-size: 24px;
+            padding: 15px;
+            margin: 10px;
+            width: 80%;
+            border-radius: 10px;
+        }
+
+        .start {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .dose {
+            background: #2196F3;
+            color: white;
+        }
+
+        .remove {
+            background: #ff9800;
+            color: white;
+        }
+
+        .reset {
+            background: #f44336;
+            color: white;
+        }
+
+        .big {
+            font-size: 32px;
+            margin-top: 20px;
+        }
+
+        .warning {
+            color: red;
+        }
+
+        #doseLog {
+            white-space: pre-line;
+            font-size: 20px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+        }
+
+        .row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .row button {
+            width: 45%;
+            font-size: 20px;
+            padding: 12px;
+        }
+
+        .row button {
+            width: 45%;
+        }
+
+        #historyPage button {
+            position: sticky;
+            bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Lecigon Timer</h2>
+
+    <input type="time" id="start" style="font-size:24px;padding:12px;width:70%;margin:10px 0;"><br>
+    <button id="mainButton" class="start" onclick="mainAction()">START</button>
+
+    <div class="big" id="eindtijd"></div><br>
+    <div id="aftellen" style="font-weight: bolder;"></div><br>
+    <div id="doseLog"></div>
+    <div class="row">
+        <button class="dose" onclick="addDose()">+1 EXTRA DOSIS</button>
+        <button class="remove" onclick="removeLastDose()">- LAATSTE DOSIS</button>
+    </div>
+    <button onclick="openHistory()">HISTORY</button>
+    <div id="historyPage" style="
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:white;
+    z-index:9999;
+    overflow:auto;
+    padding:20px;
+">
+
+        <h2>History</h2>
+
+        <div id="historyContent" style="white-space:pre-line; font-size:20px;"></div>
+
+        <button onclick="clearHistory()" style="background:#f44336;color:white;">
+            CLEAR HISTORY
+        </button>
+
+        <button onclick="closeHistory()">TERUG</button>
+    </div>
+
+    <script>
+        let state = JSON.parse(localStorage.getItem("lecigon")) || {};
+
+        state.startTime = state.startTime || null;
+        state.doses = state.doses || 0;
+        state.doseLog = state.doseLog || [];
+        state.history = state.history || {};   // 👈 BELANGRIJK
+        state.warned = state.warned || false;
+        state.running = state.running || false;
+        state.pauzed = state.pauzed || null;
+
+        function mainAction() {
+            if (!state.startTime) {
+                startTimer();
+                state.running = true;
+            } else if (state.running) {
+                stopTimer();
+            } else {
+                reset();
+            }
+
+            save();
+        }
+
+        function save() {
+            localStorage.setItem("lecigon", JSON.stringify(state));
+        }
+
+        function getEndTime() {
+            if (!state.startTime) return null;
+
+            const BASE_TIME = 18 * 3600000;          // 18 uur
+            const DOSE_PENALTY = (60 + 8) * 60000;  // 68 minuten
+
+            return state.startTime + BASE_TIME - (state.doses * DOSE_PENALTY);
+        }
+
+        function startTimer() {
+            if (state.startTime && !confirm("Timer stoppen en resetten?")) return;
+
+            let input = document.getElementById("start");
+
+            if (!input.value) {
+                let now = new Date();
+
+                // 👉 vul input veld automatisch
+                let hh = String(now.getHours()).padStart(2, '0');
+                let mm = String(now.getMinutes()).padStart(2, '0');
+
+                input.value = hh + ":" + mm;
+
+                state.startTime = now.getTime();
+
+            } else {
+                let [h, m] = input.value.split(":").map(Number);
+                let startDate = new Date();
+                startDate.setHours(h, m, 0, 0);
+
+                state.startTime = startDate.getTime();
+            }
+
+            state.doses = 0;
+            state.doseLog = [];
+            state.warned = false;
+            state.running = true;
+
+            if (Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
+
+            save();
+        }
+        function stopTimer() {
+            if (!confirm("Timer stoppen?")) return;
+            state.running = false;
+        }
+
+        function addDose() {
+            if (!state.startTime) return;
+
+            let now = new Date();
+            let time = now.toLocaleTimeString().slice(0, 5);
+            let date = now.toLocaleDateString('nl-NL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+
+            state.doses++;
+            state.doseLog.push(time);
+
+            // 👇 history opslaan
+            if (!state.history[date]) {
+                state.history[date] = [];
+            }
+            state.history[date].push(time);
+
+            save();
+        }
+        function toggleHistory() {
+            let view = document.getElementById("historyView");
+
+            if (view.style.display === "none") {
+                view.style.display = "block";
+                renderHistory();
+            } else {
+                view.style.display = "none";
+            }
+        }
+        function renderHistory() {
+            let view = document.getElementById("historyContent");
+
+            let history = state.history || {};
+            let dates = Object.keys(history).sort().reverse();
+
+            if (dates.length === 0) {
+                view.innerText = "Nog geen history";
+                return;
+            }
+
+            let text = "";
+
+            for (let date of dates) {
+                text += date + "\n";
+
+                let doses = history[date];
+                for (let i = 0; i < doses.length; i++) {
+                    text += (i + 1) + " - " + doses[i] + "\n";
+                }
+
+                text += "\n";
+            }
+
+            view.innerText = text;
+        }
+        function removeLastDose() {
+            if (state.doseLog.length === 0) return;
+
+            let last = state.doseLog[state.doseLog.length - 1];
+            if (!confirm("Verwijder dosis van " + last + "?")) return;
+
+            // laatste tijd
+            let removedTime = state.doseLog.pop();
+            state.doses--;
+
+            // 👉 vandaag bepalen
+            let now = new Date();
+            let date = now.toLocaleDateString('nl-NL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+
+            // 👉 uit history halen
+            if (state.history[date]) {
+                state.history[date].pop();
+
+                // als leeg → hele dag verwijderen
+                if (state.history[date].length === 0) {
+                    delete state.history[date];
+                }
+            }
+
+            save();
+        }
+
+        function reset() {
+            if (!confirm("Weet je zeker dat je wilt resetten?")) return;
+
+            state.startTime = null;
+            state.doses = 0;
+            state.doseLog = [];
+            state.warned = false;
+            state.running = false;
+
+            save(); // 👈 NIET localStorage.clear!
+
+            let btn = document.getElementById("mainButton");
+            btn.innerText = "START";
+            btn.className = "start";
+
+            document.getElementById("start").value = "";
+            document.getElementById("start").style.background = "";
+            document.getElementById("eindtijd").innerText = "";
+            document.getElementById("aftellen").innerText = "";
+            document.getElementById("doseLog").innerText = "";
+
+        }
+
+        function update() {
+            let endTime;
+
+            if (!state.startTime) {
+                // geen timer
+                document.getElementById("aftellen").innerText = "";
+                document.getElementById("eindtijd").innerText = "";
+            } else if (!state.running && state.remainingTime) {
+                // PAUZE
+                endTime = Date.now() + state.remainingTime;
+            } else {
+                // RUNNING
+                endTime = getEndTime();
+            }
+
+            if (!endTime) return;
+
+            let now = Date.now();
+            let diff = endTime - now;
+
+            if (diff <= 0) {
+                document.getElementById("aftellen").innerText = "⚠️ Medicijn op!";
+                document.getElementById("eindtijd").innerText = "";
+                return;
+            }
+
+            let h = Math.floor(diff / 3600000);
+            let m = Math.floor((diff % 3600000) / 60000);
+            let s = Math.floor((diff % 60000) / 1000);
+
+            let end = new Date(endTime);
+
+            let hh = String(end.getHours()).padStart(2, '0');
+            let mm = String(end.getMinutes()).padStart(2, '0');
+            let ss = String(end.getSeconds()).padStart(2, '0');
+
+            document.getElementById("eindtijd").innerText =
+                "Eindtijd: " + hh + ":" + mm + ":" + ss;
+
+            let text = "Nog: " + h + "u " + m + "m " + s + "s";
+
+            if (!state.running && state.startTime) {
+                text = "⏹ GESTOPT - " + text;
+            }
+
+            document.getElementById("aftellen").innerText = text;
+
+            // 🔔 1 uur notificatie
+            if (diff <= 3600000 && diff > 0 && !state.warned) {
+
+                state.warned = true;
+                save();
+
+                if (Notification.permission === "granted") {
+                    new Notification("Lecigon Timer", {
+                        body: "Nog 1 uur medicijn over!"
+                    });
+                }
+
+                alert("⚠️ Nog 1 uur medicijn over!");
+
+                try {
+                    new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
+                } catch (e) { }
+            }
+
+            // 👉 ALTIJD knop updaten
+            let btn = document.getElementById("mainButton");
+
+            if (!state.startTime) {
+                btn.innerText = "START";
+                btn.className = "start";
+            } else if (state.running) {
+                btn.innerText = "STOP";
+                btn.className = "remove";
+            } else {
+                btn.innerText = "RESET";
+                btn.className = "reset";
+            }
+
+            // visuele warning
+            if (diff <= 3600000) {
+                document.body.style.background = "#ffcccc";
+            } else {
+                document.body.style.background = "#f5f5f5";
+            }
+
+            // log weergave
+            let logText = "Extra doses:\n";
+
+            for (let i = 0; i < state.doseLog.length; i++) {
+                logText += (i + 1) + " - " + state.doseLog[i] + "\n";
+            }
+
+            // logText += (state.doseLog.length + 1) + " -";
+
+            document.getElementById("doseLog").innerText = logText;
+            document.querySelector(".dose").disabled = !state.startTime;
+            document.querySelector(".remove").disabled = !state.startTime;
+        }
+        function openHistory() {
+            document.getElementById("historyPage").style.display = "block";
+            renderHistory();
+        }
+        function closeHistory() {
+            document.getElementById("historyPage").style.display = "none";
+        }
+        function clearHistory() {
+            if (!confirm("Weet je zeker dat je alle history wilt verwijderen?")) return;
+
+            state.history = {};
+            save();
+
+            renderHistory(); // direct updaten
+        }
+
+        setInterval(update, 1000);
+        update();
+
+        window.addEventListener("load", () => {
+            if (state.startTime) {
+                let start = new Date(state.startTime);
+
+                let hh = String(start.getHours()).padStart(2, '0');
+                let mm = String(start.getMinutes()).padStart(2, '0');
+
+                document.getElementById("start").value = hh + ":" + mm;
+
+                // 👇 BONUS (groene achtergrond)
+                document.getElementById("start").style.background = "#d4edda";
+            }
+        });
+
+        // PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+
+</html>
