@@ -133,7 +133,8 @@
         state.history = state.history || {};   // 👈 BELANGRIJK
         state.warned = state.warned || false;
         state.running = state.running || false;
-        state.pauzed = state.pauzed || null;
+        // state.pauzed = state.pauzed || null;
+        state.remainingTime = state.remainingTime || null;
 
         function mainAction() {
             if (!state.startTime) {
@@ -162,6 +163,13 @@
         }
 
         function startTimer() {
+            // 👉 RESUME
+            if (state.remainingTime && !state.running) {
+                state.startTime = Date.now();
+                state.running = true;
+                save();
+                return;
+            }
             if (state.startTime && !confirm("Timer stoppen en resetten?")) return;
 
             let input = document.getElementById("start");
@@ -198,7 +206,14 @@
         }
         function stopTimer() {
             if (!confirm("Timer stoppen?")) return;
+
+            let endTime = getEndTime();
+            let now = Date.now();
+
+            state.remainingTime = endTime - now; // 👉 opslaan wat nog over is
             state.running = false;
+
+            save();
         }
 
         function addDose() {
@@ -314,24 +329,22 @@
         }
 
         function update() {
-            let endTime;
 
             if (!state.startTime) {
-                // geen timer
                 document.getElementById("aftellen").innerText = "";
                 document.getElementById("eindtijd").innerText = "";
-            } else if (!state.running && state.remainingTime) {
-                // PAUZE
-                endTime = Date.now() + state.remainingTime;
-            } else {
-                // RUNNING
-                endTime = getEndTime();
+                return;
             }
 
-            if (!endTime) return;
+            let diff;
 
-            let now = Date.now();
-            let diff = endTime - now;
+            // 👉 GESTOPT → vaste tijd
+            if (!state.running && state.remainingTime !== null) {
+                diff = state.remainingTime;
+            } else {
+                let endTime = getEndTime();
+                diff = endTime - Date.now();
+            }
 
             if (diff <= 0) {
                 document.getElementById("aftellen").innerText = "⚠️ Medicijn op!";
@@ -343,25 +356,30 @@
             let m = Math.floor((diff % 3600000) / 60000);
             let s = Math.floor((diff % 60000) / 1000);
 
-            let end = new Date(endTime);
+            // 👉 eindtijd alleen berekenen als running
+            let eindtijdText = "";
 
-            let hh = String(end.getHours()).padStart(2, '0');
-            let mm = String(end.getMinutes()).padStart(2, '0');
-            let ss = String(end.getSeconds()).padStart(2, '0');
+            if (state.running) {
+                let end = new Date(getEndTime());
+                let hh = String(end.getHours()).padStart(2, '0');
+                let mm = String(end.getMinutes()).padStart(2, '0');
+                let ss = String(end.getSeconds()).padStart(2, '0');
 
-            document.getElementById("eindtijd").innerText =
-                "Eindtijd: " + hh + ":" + mm + ":" + ss;
+                eindtijdText = "Eindtijd: " + hh + ":" + mm + ":" + ss;
+            }
+
+            document.getElementById("eindtijd").innerText = eindtijdText;
 
             let text = "Nog: " + h + "u " + m + "m " + s + "s";
 
-            if (!state.running && state.startTime) {
+            if (!state.running) {
                 text = "⏹ GESTOPT - " + text;
             }
 
             document.getElementById("aftellen").innerText = text;
 
-            // 🔔 1 uur notificatie
-            if (diff <= 3600000 && diff > 0 && !state.warned) {
+            // 🔔 notificatie alleen als running
+            if (state.running && diff <= 3600000 && diff > 0 && !state.warned) {
 
                 state.warned = true;
                 save();
@@ -379,7 +397,7 @@
                 } catch (e) { }
             }
 
-            // 👉 ALTIJD knop updaten
+            // 👉 knop status
             let btn = document.getElementById("mainButton");
 
             if (!state.startTime) {
@@ -393,33 +411,36 @@
                 btn.className = "reset";
             }
 
-            // visuele warning
-            if (diff <= 3600000) {
-                document.body.style.background = "#ffcccc";
-            } else {
-                document.body.style.background = "#f5f5f5";
-            }
+            // achtergrond
+            document.body.style.background =
+                diff <= 3600000 ? "#ffcccc" : "#f5f5f5";
 
-            // log weergave
+            // log
             let logText = "Extra doses:\n";
-
             for (let i = 0; i < state.doseLog.length; i++) {
                 logText += (i + 1) + " - " + state.doseLog[i] + "\n";
             }
 
-            // logText += (state.doseLog.length + 1) + " -";
-
             document.getElementById("doseLog").innerText = logText;
+
             document.querySelector(".dose").disabled = !state.startTime;
             document.querySelector(".remove").disabled = !state.startTime;
+
+            // 👉 running → remainingTime bijwerken
+            if (state.running) {
+                state.remainingTime = diff;
+            }
         }
+
         function openHistory() {
             document.getElementById("historyPage").style.display = "block";
             renderHistory();
         }
+
         function closeHistory() {
             document.getElementById("historyPage").style.display = "none";
         }
+
         function clearHistory() {
             if (!confirm("Weet je zeker dat je alle history wilt verwijderen?")) return;
 
