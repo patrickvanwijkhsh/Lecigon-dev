@@ -15,6 +15,8 @@
             font-family: Arial;
             text-align: center;
             background: #f5f5f5;
+            margin: 0;
+            padding: 0;
         }
 
         button {
@@ -79,9 +81,99 @@
             width: 45%;
         }
 
-        #historyPage button {
-            position: sticky;
-            bottom: 10px;
+        #historyFooter {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            padding: 10px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #historyFooter {
+            display: flex;
+            gap: 10px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px auto;
+            width: 100%;
+            margin: 10px 0;
+            text-align: left;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+        }
+
+        .card .meta {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .dose-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .delete-day {
+            margin-top: 10px;
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px;
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        #historyContent {
+            padding: 0 12px 120px 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+        }
+
+        .bar-label {
+            width: 50px;
+            flex-shrink: 0;
+            font-size: 13px;
+        }
+
+        .bar-container {
+            flex: 1;
+            height: 8px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            margin-top: -22px;
+
+            background: #2e7d32;
+            border-radius: 5px;
+        }
+
+        .bar-count {
+            width: 25px;
+            text-align: right;
+            font-size: 12px;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -117,11 +209,15 @@
 
         <div id="historyContent" style="white-space:pre-line; font-size:20px;"></div>
 
-        <button onclick="clearHistory()" style="background:#f44336;color:white;">
-            CLEAR HISTORY
-        </button>
+        <div id="historyFooter">
+            <button onclick="clearHistory()" style="background:#f44336;color:white;width:48%;">
+                CLEAR
+            </button>
 
-        <button onclick="closeHistory()">TERUG</button>
+            <button onclick="closeHistory()" style="width:48%;">
+                TERUG
+            </button>
+        </div>
     </div>
 
     <script>
@@ -133,7 +229,6 @@
         state.history = state.history || {};   // 👈 BELANGRIJK
         state.warned = state.warned || false;
         state.running = state.running || false;
-        // state.pauzed = state.pauzed || null;
         state.remainingTime = state.remainingTime || null;
 
         function mainAction() {
@@ -204,6 +299,57 @@
 
             save();
         }
+        function renderTimeAnalysis() {
+
+            let history = state.history || {};
+            let buckets = [0, 0, 0, 0];
+
+            Object.values(history).forEach(day => {
+                day.forEach(time => {
+                    let [h] = time.split(":").map(Number);
+
+                    if (h < 6) buckets[0]++;
+                    else if (h < 12) buckets[1]++;
+                    else if (h < 18) buckets[2]++;
+                    else buckets[3]++;
+                });
+            });
+
+            let labels = ["00-06", "06-12", "12-18", "18-24"];
+            let max = Math.max(...buckets, 1);
+
+            let html = `<div class="card">
+        <h3 style="margin-bottom:6px;">⏱ Tijdstip analyse</h3>
+    `;
+
+            buckets.forEach((count, i) => {
+                let percentage = count === max ? 100 : (count / max) * 60;
+
+                // 👇 CRUCIAAL voor Safari
+                let width = count === 0 ? "0%" : Math.max(5, percentage) + "%";
+                let color = count === max ? "#2e7d32" : "#a5d6a7";
+                console.log("width", width);
+
+                html += `
+            <div class="bar-row">
+                <div class="bar-label">${labels[i]}</div>
+                <div class="bar-container">
+                    <div class="bar-fill" data-width="${width}" style="background:${color}"></div>
+                </div>
+                <div class="bar-count">${count}</div>
+            </div>
+        `;
+            });
+            console.log("buckets ", buckets);
+            let peakIndex = buckets.indexOf(max);
+
+            html += `<div style="margin-top:6px;font-size:12px;color:#666;">
+        🔥 ${labels[peakIndex]}
+    </div></div>`;
+
+            return html;
+        }
+
         function stopTimer() {
             if (!confirm("Timer stoppen?")) return;
 
@@ -237,6 +383,9 @@
             state.history[date].push(time);
 
             save();
+            if (document.getElementById("historyPage").style.display === "block") {
+                renderHistory();
+            }
         }
         function toggleHistory() {
             let view = document.getElementById("historyView");
@@ -249,30 +398,57 @@
             }
         }
         function renderHistory() {
-            let view = document.getElementById("historyContent");
+            const container = document.getElementById("historyContent");
 
-            let history = state.history || {};
-            let dates = Object.keys(history).sort().reverse();
+            const history = state.history || {};
+            const dates = Object.keys(history).sort().reverse();
 
             if (dates.length === 0) {
-                view.innerText = "Nog geen history";
+                container.innerHTML = "<p>Nog geen history</p>";
                 return;
             }
 
-            let text = "";
+            let html = renderTimeAnalysis(); // 👈 eerst analyse
 
-            for (let date of dates) {
-                text += date + "\n";
+            const DOSE_MIN = 68;
 
-                let doses = history[date];
-                for (let i = 0; i < doses.length; i++) {
-                    text += (i + 1) + " - " + doses[i] + "\n";
-                }
+            dates.forEach(date => {
+                const doses = history[date];
+                const count = doses.length;
 
-                text += "\n";
-            }
+                const reduction = count * DOSE_MIN;
+                const h = Math.floor(reduction / 60);
+                const m = reduction % 60;
 
-            view.innerText = text;
+                html += `<div class="card">
+            <h3>📅 ${date}</h3>
+            <div class="meta">
+                Doses: ${count}<br>
+                Verkorting: ${h}u ${m}m
+            </div>
+        `;
+
+                doses.forEach((t, i) => {
+                    html += `<div class="dose-item">${i + 1} - ${t}</div>`;
+                });
+
+                html += `<button class="delete-day" onclick="deleteDay('${date}')">🗑 Verwijder dag</button>`;
+                html += `</div>`;
+            });
+
+            container.innerHTML = html;
+            requestAnimationFrame(() => {
+                document.querySelectorAll(".bar-fill").forEach(el => {
+                    el.style.width = el.dataset.width;
+                });
+            });
+        }
+        function deleteDay(date) {
+            if (!confirm("Verwijder alle doses van " + date + "?")) return;
+
+            delete state.history[date];
+            save();
+            renderHistory();
         }
         function removeLastDose() {
             if (state.doseLog.length === 0) return;
@@ -303,6 +479,9 @@
             }
 
             save();
+            if (document.getElementById("historyPage").style.display === "block") {
+                renderHistory();
+            }
         }
 
         function reset() {
